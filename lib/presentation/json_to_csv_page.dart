@@ -27,7 +27,7 @@ class _JsonToCsvPageState extends State<JsonToCsvPage> {
                 ElevatedButton(
                   onPressed: () =>
                       context.read<JsonToCsvCubit>().addNewJsonBlock(),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text('Add Block'),
@@ -36,10 +36,11 @@ class _JsonToCsvPageState extends State<JsonToCsvPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 50),
+                const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: () {},
-                  child: Row(
+                  onPressed: ()=>
+                      context.read<JsonToCsvCubit>().generateAndDownloadCsv(context),
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text('Generate CSV'),
