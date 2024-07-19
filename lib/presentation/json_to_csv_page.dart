@@ -43,8 +43,21 @@ class _JsonToCsvPageState extends State<JsonToCsvPage> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Generate CSV'),
-                      const SizedBox(width: 10),
+                       Text('Generate CSV'),
+                       SizedBox(width: 10),
+                      Icon(Icons.file_download),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: ()=>
+                      context.read<JsonToCsvCubit>().generateAndDownloadExcel(context),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                       Text('Generate Excel'),
+                       SizedBox(width: 10),
                       Icon(Icons.file_download),
                     ],
                   ),

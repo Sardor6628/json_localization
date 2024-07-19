@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:developer';
-
 import 'package:bloc/bloc.dart';
 import 'package:csv/csv.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:localization_webpage/model/jsonWithDetailsModel.dart';
-import 'package:meta/meta.dart';
 import 'dart:html' as html;
 
 part 'json_to_csv_state.dart';
@@ -25,39 +25,15 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
         ..jsonData = jsonData.jsonData
         ..isJsonValid = true
         ..isConfirmed = false;
-      log('Json is valid:');
     } catch (e) {
       state.jsonDataList.firstWhere((element) => element == jsonData)
         ..jsonData = jsonData.jsonData
         ..isJsonValid = false
         ..isConfirmed = false;
-      log('Json is invalid:');
     } finally {
       emit(state.copyWith(
         jsonDataList: List.from(state.jsonDataList),
       ));
-    }
-  }
-
-  void confirmJson(JsonWithDetailsModel jsonData) {
-    try {
-      //check if json is Valid
-      final Map<String, dynamic> jsonDataMap =
-          jsonDecode(jsonData.textEditingController.text);
-      if (jsonDataMap.isEmpty) {
-        throw Exception('Empty JSON');
-      }
-      state.jsonDataList.firstWhere((element) => element == jsonData)
-        ..jsonData = jsonData.jsonData
-        ..isJsonValid = true
-        ..isConfirmed = true;
-      log('Json is valid: ${state.jsonDataList.firstWhere((element) => element == jsonData)}');
-    } catch (e) {
-      state.jsonDataList.firstWhere((element) => element == jsonData)
-        ..jsonData = jsonData.jsonData
-        ..isJsonValid = false
-        ..isConfirmed = false;
-      log('Json is invalid: ${state.jsonDataList.firstWhere((element) => element == jsonData)}');
     }
   }
 
@@ -76,20 +52,103 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
     log('${state.jsonDataList}');
   }
 
-  void removeJsonBlock(JsonWithDetailsModel jsonData) {
-    final newList = List<JsonWithDetailsModel>.from(state.jsonDataList)
-      ..remove(jsonData);
-    emit(state.copyWith(
-      jsonDataList: newList,
-    ));
-    log('Removed JSON block, length: ${state.jsonDataList.length}');
-    log('${state.jsonDataList}');
+  void generateAndDownloadExcel(BuildContext context) {
+    if (!checkIfCanGenerate()) {
+      Fluttertoast.showToast(
+          msg: 'One or more JSON blocks are invalid',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0);
+      return;
+    }
+
+    try {
+      final List<List<CellValue>> csvData = [];
+      Map<String, List<String>> _dataFiltered = {};
+
+      for (var i = 0; i < state.jsonDataList.length; i++) {
+        if (state.jsonDataList[i].isJsonValid) {
+          final Map<String, dynamic> jsonDataMap =
+              jsonDecode(state.jsonDataList[i].textEditingController.text);
+
+          if (_dataFiltered.isEmpty) {
+            _dataFiltered = jsonDataMap
+                .map((key, value) => MapEntry(key, [value.toString()]));
+          } else {
+            jsonDataMap.forEach((key, value) {
+              _dataFiltered.update(
+                  key, (valueList) => valueList..add(value.toString()),
+                  ifAbsent: () => List.filled(i, "")..add(value.toString()));
+            });
+          }
+        }
+
+        // Ensure that all keys have the correct number of elements
+        _dataFiltered.forEach((key, value) {
+          if (value.length < i + 1) {
+            _dataFiltered.update(key, (valueList) => valueList..add(""));
+          }
+        });
+      }
+
+      csvData.add([
+        TextCellValue('Key'),
+        ...state.jsonDataList
+            .map((e) =>
+                TextCellValue('Block ${state.jsonDataList.indexOf(e) + 1}'))
+            .toList()
+      ]);
+
+      _dataFiltered.forEach((key, value) {
+        List<TextCellValue>? _value =
+            _dataFiltered[key]?.map((e) => TextCellValue(e)).toList();
+        csvData.add([TextCellValue(key), ...?_value]);
+      });
+
+      if (csvData.length < 2) {
+        Fluttertoast.showToast(
+            msg: 'No valid JSON blocks to generate CSV',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            timeInSecForIosWeb: 1,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+            fontSize: 16.0);
+        return;
+      }
+
+      var excel = Excel.createExcel();
+      log('Excel data: ${excel}');
+      for (var i = 0; i < csvData.length; i++) {
+        excel['Sheet1'].appendRow(csvData[i]);
+      }
+      log('Excel data: $excel');
+
+      final List<int> excelBytes = excel.save()!;
+      emit(state.copyWith(
+        error: '',
+      ));
+    } catch (e) {
+      log("Error: $e");
+      emit(state.copyWith(
+        error: 'Error: ${e.toString()}',
+      ));
+    }
   }
 
   void generateAndDownloadCsv(BuildContext context) {
     if (!checkIfCanGenerate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('One or more JSON blocks are invalid')));
+      Fluttertoast.showToast(
+          msg: 'One or more JSON blocks are invalid',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0);
       return;
     }
     try {
@@ -125,6 +184,17 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
       _dataFiltered.forEach((key, value) {
         csvData.add([key, ...value]);
       });
+      if (csvData.length < 2) {
+        Fluttertoast.showToast(
+            msg: 'No valid JSON blocks to generate CSV',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            timeInSecForIosWeb: 1,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+            fontSize: 16.0);
+        return;
+      }
 
       final String csv = const ListToCsvConverter().convert(csvData);
       final bytes = utf8.encode(csv);
