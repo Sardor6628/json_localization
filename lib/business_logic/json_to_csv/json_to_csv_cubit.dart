@@ -53,6 +53,15 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
   }
 
   void generateAndDownloadExcel(BuildContext context) {
+    Fluttertoast.showToast(
+        msg: 'This feature is not available yet',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0);
+    return;
     if (!checkIfCanGenerate()) {
       Fluttertoast.showToast(
           msg: 'One or more JSON blocks are invalid',
@@ -85,11 +94,9 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
             });
           }
         }
-
-        // Ensure that all keys have the correct number of elements
         _dataFiltered.forEach((key, value) {
           if (value.length < i + 1) {
-            _dataFiltered.update(key, (valueList) => valueList..add(""));
+            _dataFiltered.update(key, (valueList) => valueList..add(" "));
           }
         });
       }
@@ -105,7 +112,7 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
       _dataFiltered.forEach((key, value) {
         List<TextCellValue>? _value =
             _dataFiltered[key]?.map((e) => TextCellValue(e)).toList();
-        csvData.add([TextCellValue(key), ...?_value]);
+        csvData.add([TextCellValue(key), ..._value ?? []]);
       });
 
       if (csvData.length < 2) {
@@ -133,9 +140,7 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
       ));
     } catch (e) {
       log("Error: $e");
-      emit(state.copyWith(
-        error: 'Error: ${e.toString()}',
-      ));
+      throw Exception('Error: ${e.toString()}');
     }
   }
 
@@ -157,15 +162,18 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
       for (var i = 0; i < state.jsonDataList.length; i++) {
         if (state.jsonDataList[i].isJsonValid) {
           final Map<String, dynamic> jsonDataMap =
-              jsonDecode(state.jsonDataList[i].textEditingController.text);
+          jsonDecode(state.jsonDataList[i].textEditingController.text);
           if (_dataFiltered.isEmpty) {
-            _dataFiltered = jsonDataMap
-                .map((key, value) => MapEntry(key, [value.toString()]));
+            _dataFiltered = jsonDataMap.map((key, value) {
+              return MapEntry(key, [value.toString().replaceAll('\n', '\\n')]);
+            });
           } else {
             jsonDataMap.forEach((key, value) {
               _dataFiltered.update(
-                  key, (valueList) => valueList..add(value.toString()),
-                  ifAbsent: () => ["" * i, value.toString()]);
+                  key,
+                      (valueList) => valueList
+                    ..add(value.toString().replaceAll('\n', '\\n')),
+                  ifAbsent: () => ["" * i, value.toString().replaceAll('\n', '\\n')]);
             });
           }
         }
@@ -207,17 +215,11 @@ class JsonToCsvCubit extends Cubit<JsonToCsvState> {
 
       html.Url.revokeObjectUrl(url); // Cleanup
 
-      emit(state.copyWith(
-        csvOutput: csv,
-        error: '',
-      ));
+      emit(state.copyWith(csvOutput: csv, error: ''));
     } catch (e) {
-      emit(state.copyWith(
-        error: 'Error: ${e.toString()}',
-      ));
+      emit(state.copyWith(error: 'Error: ${e.toString()}'));
     }
   }
-
   bool checkIfCanGenerate() {
     List<bool> isValidOrEmpty = [];
     for (var i = 0; i < state.jsonDataList.length; i++) {
